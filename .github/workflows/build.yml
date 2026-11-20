@@ -1,0 +1,39 @@
+name: Build Unsigned IPA
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate Xcode Project & Build IPA
+        run: |
+          brew install xcodegen
+          cat <<EOF > project.yml
+          name: FlyoverNav3D
+          options:
+            bundleIdPrefix: com.custom.nav
+          targets:
+            FlyoverNav3D:
+              type: application
+              platform: iOS
+              deploymentTarget: "17.0"
+              sources: [FlyoverNavApp.swift]
+              info:
+                path: Info.plist
+                properties:
+                  NSLocationWhenInUseUsageDescription: "Required for 3D satellite navigation"
+                  UILaunchScreen: {}
+          EOF
+          xcodegen generate
+          xcodebuild -project FlyoverNav3D.xcodeproj -scheme FlyoverNav3D -configuration Release -sdk iphoneos -archivePath build/FlyoverNav3D.xcarchive archive CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO
+          mkdir -p Payload
+          cp -r build/FlyoverNav3D.xcarchive/Products/Applications/FlyoverNav3D.app Payload/
+          zip -r FlyoverNav3D.ipa Payload
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FlyoverNav3D-IPA
+          path: FlyoverNav3D.ipa
